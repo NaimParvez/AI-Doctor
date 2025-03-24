@@ -206,7 +206,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For questions or feedback, please reach out to [Naim Parvez](mailto:parveznaim0@gmail.com),[ Sartaj Alam Pritom](mailto:sartajalam0010@gmail.com)[Jerin Romijah Tuli](mailto:ramijahtuli786@gmail.com).
+For questions or feedback, please reach out to [Naim Parvez](mailto:parveznaim0@gmail.com),[ Sartaj Alam Pritom](mailto:sartajalam0010@gmail.com),[ Jerin Romijah Tuli](mailto:ramijahtuli786@gmail.com).
 
 ---
 
