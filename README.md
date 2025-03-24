@@ -206,7 +206,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For questions or feedback, please reach out to [your-email@example.com](mailto:your-email@example.com)[your-email@example.com](mailto:your-email@example.com)[your-email@example.com](mailto:your-email@example.com).
+For questions or feedback, please reach out to [Naim Parvez](mailto:parveznaim0@gmail.com),[ Sartaj Alam Pritom](mailto:sartajalam0010@gmail.com)[Jerin Romijah Tuli](mailto:ramijahtuli786@gmail.com).
 
 ---
 
@@ -216,5 +216,3 @@ For questions or feedback, please reach out to [your-email@example.com](mailto:y
 - **Contact Information**: Update the email address in the "Contact" section with your actual email.
 - **License**: If you’re using a different license, update the "License" section and include the appropriate `LICENSE` file in your repository.
 - **Additional Sections**: You can add sections like "Known Issues," "Roadmap," or "Acknowledgements" if needed.
-
-This README provides a clear and professional overview of your project, making it easy for others to understand, set up, and contribute to it. Let me know if you’d like to add more sections or customize it further!
