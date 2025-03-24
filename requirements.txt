@@ -1,0 +1,17 @@
+flask
+flask-sqlalchemy
+flask-login
+flask-migrate
+python-dotenv
+ollama  # Add Ollama client
+torch
+torchaudio
+pillow
+speechrecognition
+pydub
+gtts
+pyaudio
+werkzeug
+soundfile
+speechrecognition  # For speech-to-text (free Google Speech Recognition API)
+pyttsx3

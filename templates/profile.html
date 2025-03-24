@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}AI Doctor - Profile{% endblock %}
+{% block content %}
+    <header>
+        <img src="{{ url_for('static', filename='images/doctor-avatar.png') }}" alt="Doctor" class="logo">
+        <h1>AI Doctor - Update Profile</h1>
+        <a href="{{ url_for('auth.logout') }}">Logout</a>
+        <a href="{{ url_for('chat.chat_page') }}">Back to Chat</a>
+    </header>
+    <form method="POST">
+        <input type="text" name="username" value="{{ user.username }}" disabled>
+        <input type="email" name="email" value="{{ user.email }}" required>
+        <input type="date" name="date_of_birth" value="{{ user.date_of_birth.strftime('%Y-%m-%d') if user.date_of_birth else '' }}">
+        <select name="gender">
+            <option value="">Select Gender</option>
+            <option value="male" {% if user.gender == 'male' %}selected{% endif %}>Male</option>
+            <option value="female" {% if user.gender == 'female' %}selected{% endif %}>Female</option>
+            <option value="other" {% if user.gender == 'other' %}selected{% endif %}>Other</option>
+        </select>
+        <h3>Medical History (Select all that apply)</h3>
+        <div class="medical-history">
+            <h4>Non-Communicable Diseases (NCDs)</h4>
+            <label><input type="checkbox" name="medical_history" value="Cardiovascular Diseases" {% if 'Cardiovascular Diseases' in user.get_medical_history() %}checked{% endif %}> Cardiovascular Diseases (হৃদরোগ)</label>
+            <label><input type="checkbox" name="medical_history" value="Diabetes" {% if 'Diabetes' in user.get_medical_history() %}checked{% endif %}> Diabetes (ডায়াবেটিস)</label>
+            <label><input type="checkbox" name="medical_history" value="Chronic Respiratory Diseases (COPD)" {% if 'Chronic Respiratory Diseases (COPD)' in user.get_medical_history() %}checked{% endif %}> Chronic Respiratory Diseases (দীর্ঘস্থায়ী শ্বাসযন্ত্রের রোগ)</label>
+            <label><input type="checkbox" name="medical_history" value="Cancer" {% if 'Cancer' in user.get_medical_history() %}checked{% endif %}> Cancer (ক্যান্সার)</label>
+            <label><input type="checkbox" name="medical_history" value="Hypertension" {% if 'Hypertension' in user.get_medical_history() %}checked{% endif %}> Hypertension (উচ্চ রক্তচাপ)</label>
+
+            <h4>Communicable Diseases</h4>
+            <label><input type="checkbox" name="medical_history" value="Dengue Fever" {% if 'Dengue Fever' in user.get_medical_history() %}checked{% endif %}> Dengue Fever (ডেঙ্গু জ্বর)</label>
+            <label><input type="checkbox" name="medical_history" value="Typhoid Fever" {% if 'Typhoid Fever' in user.get_medical_history() %}checked{% endif %}> Typhoid Fever (টাইফয়েড জ্বর)</label>
+            <label><input type="checkbox" name="medical_history" value="Hepatitis B" {% if 'Hepatitis B' in user.get_medical_history() %}checked{% endif %}> Hepatitis B (হেপাটাইটিস বি)</label>
+            <label><input type="checkbox" name="medical_history" value="Leptospirosis" {% if 'Leptospirosis' in user.get_medical_history() %}checked{% endif %}> Leptospirosis (লেপ্টোস্পাইরোসিস)</label>
+            <label><input type="checkbox" name="medical_history" value="Gastroenteritis/Diarrheal Diseases" {% if 'Gastroenteritis/Diarrheal Diseases' in user.get_medical_history() %}checked{% endif %}> Gastroenteritis/Diarrheal Diseases (গ্যাস্ট্রোএন্টারাইটিস/ডায়রিয়া)</label>
+            <label><input type="checkbox" name="medical_history" value="Chikungunya" {% if 'Chikungunya' in user.get_medical_history() %}checked{% endif %}> Chikungunya (চিকুনগুনিয়া)</label>
+            <label><input type="checkbox" name="medical_history" value="COVID-19" {% if 'COVID-19' in user.get_medical_history() %}checked{% endif %}> COVID-19 (কোভিড-১৯)</label>
+            <label><input type="checkbox" name="medical_history" value="Tuberculosis" {% if 'Tuberculosis' in user.get_medical_history() %}checked{% endif %}> Tuberculosis (যক্ষ্মা)</label>
+            <label><input type="checkbox" name="medical_history" value="HIV" {% if 'HIV' in user.get_medical_history() %}checked{% endif %}> HIV (এইচআইভি)</label>
+            <label><input type="checkbox" name="medical_history" value="Tetanus" {% if 'Tetanus' in user.get_medical_history() %}checked{% endif %}> Tetanus (টিটেনাস)</label>
+            <label><input type="checkbox" name="medical_history" value="Malaria" {% if 'Malaria' in user.get_medical_history() %}checked{% endif %}> Malaria (ম্যালেরিয়া)</label>
+            <label><input type="checkbox" name="medical_history" value="Measles" {% if 'Measles' in user.get_medical_history() %}checked{% endif %}> Measles (হাম)</label>
+            <label><input type="checkbox" name="medical_history" value="Rubella" {% if 'Rubella' in user.get_medical_history() %}checked{% endif %}> Rubella (রুবেলা)</label>
+            <label><input type="checkbox" name="medical_history" value="Leprosy" {% if 'Leprosy' in user.get_medical_history() %}checked{% endif %}> Leprosy (কুষ্ঠরোগ)</label>
+        </div>
+        <button type="submit">Update Profile</button>
+    </form>
+{% endblock %}

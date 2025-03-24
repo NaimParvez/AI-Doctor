@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}AI Doctor - Login{% endblock %}
+{% block content %}
+    <header>
+        <img src="{{ url_for('static', filename='images/doctor-avatar.png') }}" alt="Doctor" class="logo">
+        <h1>AI Doctor - Login</h1>
+    </header>
+    <form method="POST">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+    </form>
+    <p>Don't have an account? <a href="{{ url_for('auth.register') }}">Register</a></p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <p class="{{ category }}">{{ message }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+{% endblock %}

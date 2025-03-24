@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}AI Doctor - Register{% endblock %}
+{% block content %}
+    <header>
+        <img src="{{ url_for('static', filename='images/doctor-avatar.png') }}" alt="Doctor" class="logo">
+        <h1>AI Doctor - Register</h1>
+        <a href="{{ url_for('auth.login') }}">Login</a>
+    </header>
+    <form method="POST">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="email" name="email" placeholder="Email" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <input type="date" name="date_of_birth" placeholder="Date of Birth">
+        <select name="gender">
+            <option value="">Select Gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+        </select>
+        <h3>Medical History (Select all that apply)</h3>
+        <div class="medical-history">
+            <h4>Non-Communicable Diseases (NCDs)</h4>
+            <label><input type="checkbox" name="medical_history" value="Cardiovascular Diseases"> Cardiovascular Diseases (হৃদরোগ)</label>
+            <label><input type="checkbox" name="medical_history" value="Diabetes"> Diabetes (ডায়াবেটিস)</label>
+            <label><input type="checkbox" name="medical_history" value="Chronic Respiratory Diseases (COPD)"> Chronic Respiratory Diseases (দীর্ঘস্থায়ী শ্বাসযন্ত্রের রোগ)</label>
+            <label><input type="checkbox" name="medical_history" value="Cancer"> Cancer (ক্যান্সার)</label>
+            <label><input type="checkbox" name="medical_history" value="Hypertension"> Hypertension (উচ্চ রক্তচাপ)</label>
+
+            <h4>Communicable Diseases</h4>
+            <label><input type="checkbox" name="medical_history" value="Dengue Fever"> Dengue Fever (ডেঙ্গু জ্বর)</label>
+            <label><input type="checkbox" name="medical_history" value="Typhoid Fever"> Typhoid Fever (টাইফয়েড জ্বর)</label>
+            <label><input type="checkbox" name="medical_history" value="Hepatitis B"> Hepatitis B (হেপাটাইটিস বি)</label>
+            <label><input type="checkbox" name="medical_history" value="Leptospirosis"> Leptospirosis (লেপ্টোস্পাইরোসিস)</label>
+            <label><input type="checkbox" name="medical_history" value="Gastroenteritis/Diarrheal Diseases"> Gastroenteritis/Diarrheal Diseases (গ্যাস্ট্রোএন্টারাইটিস/ডায়রিয়া)</label>
+            <label><input type="checkbox" name="medical_history" value="Chikungunya"> Chikungunya (চিকুনগুনিয়া)</label>
+            <label><input type="checkbox" name="medical_history" value="COVID-19"> COVID-19 (কোভিড-১৯)</label>
+            <label><input type="checkbox" name="medical_history" value="Tuberculosis"> Tuberculosis (যক্ষ্মা)</label>
+            <label><input type="checkbox" name="medical_history" value="HIV"> HIV (এইচআইভি)</label>
+            <label><input type="checkbox" name="medical_history" value="Tetanus"> Tetanus (টিটেনাস)</label>
+            <label><input type="checkbox" name="medical_history" value="Malaria"> Malaria (ম্যালেরিয়া)</label>
+            <label><input type="checkbox" name="medical_history" value="Measles"> Measles (হাম)</label>
+            <label><input type="checkbox" name="medical_history" value="Rubella"> Rubella (রুবেলা)</label>
+            <label><input type="checkbox" name="medical_history" value="Leprosy"> Leprosy (কুষ্ঠরোগ)</label>
+        </div>
+        <button type="submit">Register</button>
+    </form>
+{% endblock %}

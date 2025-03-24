@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}AI Doctor - Chat{% endblock %}
+{% block content %}
+    <header>
+        <img src="{{ url_for('static', filename='images/doctor-avatar.png') }}" alt="Doctor" class="logo">
+        <h1>AI Doctor - Dr. Jhatka</h1>
+        <a href="{{ url_for('auth.profile') }}">Profile</a>
+        <a href="{{ url_for('auth.logout') }}">Logout</a>
+        <a href="{{ url_for('main.history') }}">History</a>
+    </header>
+    <div class="chat-window">
+        <div class="messages">
+            {% for conversation in conversations %}
+                {% for message in conversation.messages %}
+                    <div class="message {{ message.sender }}">
+                        <div class="message-content">
+                            {% if message.text_content %}<p>{{ message.text_content }}</p>{% endif %}
+                            {% if message.image_path %}
+                                {% if message.image_path.endswith(('.png', '.jpg', '.jpeg', '.gif')) %}
+                                    <img src="{{ message.image_path }}" class="uploaded-image">
+                                {% elif message.image_path.endswith('.pdf') %}
+                                    <a href="{{ message.image_path }}" target="_blank">View PDF: {{ message.image_path.split('/')[-1] }}</a>
+                                {% endif %}
+                            {% endif %}
+                            {% if message.audio_path %}<audio controls src="{{ message.audio_path }}"></audio>{% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+        <div class="input-area">
+            <div class="input-row">
+                <i class="fas fa-paperclip attach-icon"></i>
+                <input type="text" id="chat-input" placeholder="Type or speak...">
+                <i class="fas fa-microphone mic-icon"></i>
+                <i class="fas fa-camera camera-icon"></i>
+                <input type="file" id="file-upload" accept="image/*,audio/*,application/pdf" style="display:none;">
+                <i class="fas fa-paper-plane send-icon"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attach Modal -->
+    <div class="attach-modal" style="display: none;">
+        <div class="attach-content">
+            <div class="attach-header">
+                <h3>Attach Files</h3>
+                <button class="close-modal">×</button>
+            </div>
+            <div class="upload-area">
+                <p>Drag and drop to upload</p>
+                <button class="select-files">Select files</button>
+            </div>
+            <div class="recent-files">
+                <h4>Recent Files</h4>
+                <div class="file-list" id="recent-files-list">
+                    <!-- Recent files will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
