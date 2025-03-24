@@ -1,6 +1,3 @@
-Below is a professional and comprehensive GitHub `README.md` file for your **AI-Doctor-Jhatka** project. It includes an overview of the project, features, installation instructions, usage guide, project structure, and contribution guidelines. The README is formatted in Markdown and is designed to help users understand, set up, and contribute to your project.
-
----
 
 # AI-Doctor-Jhatka
 
