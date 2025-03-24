@@ -104,6 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const text = chatInput.value.trim();
         if (!text && !uploadedFile) return;
 
+        // Clear the textbox immediately after capturing the text
+        chatInput.value = '';
+
         const thinkingDiv = showThinking();
 
         let filePath = null, audioPath = null;
@@ -118,21 +121,30 @@ document.addEventListener('DOMContentLoaded', () => {
             audio_path: audioPath,
             generate_speech: true
         };
-        const response = await fetch('/chat/message', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(messageData)
-        }).then(res => res.json());
 
-        removeThinking(thinkingDiv);
-        addMessage('user', text, filePath);
-        addMessage('doctor', response.response, null, response.audio);
+        try {
+            const response = await fetch('/chat/message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(messageData)
+            }).then(res => {
+                if (!res.ok) throw new Error('Failed to send message');
+                return res.json();
+            });
 
-        chatInput.value = '';
-        if (uploadedFile) {
-            const previewDiv = document.querySelector('.file-preview');
-            if (previewDiv) previewDiv.remove();
-            uploadedFile = null;
+            removeThinking(thinkingDiv);
+            addMessage('user', text, filePath);
+            addMessage('doctor', response.response, null, response.audio);
+        } catch (error) {
+            removeThinking(thinkingDiv);
+            addMessage('doctor', 'Error sending message: ' + error.message);
+        } finally {
+            // Clear the file preview and reset uploadedFile
+            if (uploadedFile) {
+                const previewDiv = document.querySelector('.file-preview');
+                if (previewDiv) previewDiv.remove();
+                uploadedFile = null;
+            }
         }
     };
 

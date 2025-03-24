@@ -15,18 +15,41 @@ def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp3', 'wav', 'webm', 'pdf'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def get_user_info():
+def get_user_info(conversation_id=None):
     if not current_user.is_authenticated:
         return None
     user_info = {
         'username': current_user.username,
-        'email': current_user.email,
-        'medical_history': current_user.get_medical_history()
+        'email': current_user.email
     }
     if current_user.age:
         user_info['age'] = current_user.age
     if current_user.gender:
         user_info['gender'] = current_user.gender
+    if current_user.medical_history:
+        user_info['medical_history'] = current_user.medical_history
+    else:
+        user_info['medical_history'] = "No medical history provided."
+
+    # Fetch previous conversation messages if a conversation_id is provided
+    if conversation_id:
+        conversation = Conversation.query.get(conversation_id)
+        if conversation and conversation.user_id == current_user.id:
+            messages = conversation.messages.all()
+            user_info['previous_conversation'] = [
+                {
+                    'sender': message.sender,
+                    'text': message.text_content,
+                    'image_path': message.image_path,
+                    'timestamp': message.timestamp.isoformat()
+                }
+                for message in messages
+            ]
+        else:
+            user_info['previous_conversation'] = []
+    else:
+        user_info['previous_conversation'] = []
+
     return user_info
 
 @chat_bp.route('/')
@@ -97,7 +120,8 @@ def send_message():
     conversation.last_updated = datetime.utcnow()
     db.session.commit()
     
-    user_info = get_user_info()
+    # Pass the conversation_id to get_user_info to fetch previous messages
+    user_info = get_user_info(conversation_id=conversation.id)
     if file_path:
         abs_file_path = os.path.join(current_app.root_path, '..', file_path.lstrip('/'))
         response_text = llm_service.process_image_query(abs_file_path, text_content, user_info)

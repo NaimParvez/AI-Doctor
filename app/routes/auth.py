@@ -35,6 +35,7 @@ def register():
         password = request.form.get('password')
         date_of_birth = request.form.get('date_of_birth')
         gender = request.form.get('gender')
+        medical_history = request.form.get('medical_history')  # New field
         
         if User.query.filter_by(username=username).first():
             flash('Username already exists', 'error')
@@ -49,7 +50,8 @@ def register():
             username=username,
             email=email,
             date_of_birth=datetime.strptime(date_of_birth, '%Y-%m-%d') if date_of_birth else None,
-            gender=gender
+            gender=gender,
+            medical_history=medical_history  # Set the medical history
         )
         user.set_password(password)
         db.session.add(user)

@@ -2,7 +2,6 @@ from app import db, login_manager
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-import json
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -11,8 +10,8 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128))
     date_of_birth = db.Column(db.Date)
     gender = db.Column(db.String(10))
+    medical_history = db.Column(db.Text)  # New field for medical history
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    medical_history = db.Column(db.Text, default='[]')  # Store as JSON string
     conversations = db.relationship('Conversation', backref='user', lazy='dynamic')
     
     def set_password(self, password):
@@ -27,15 +26,6 @@ class User(UserMixin, db.Model):
             today = datetime.today()
             return today.year - self.date_of_birth.year - ((today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day))
         return None
-    
-    def get_medical_history(self):
-        try:
-            return json.loads(self.medical_history)
-        except json.JSONDecodeError:
-            return []
-    
-    def set_medical_history(self, history_list):
-        self.medical_history = json.dumps(history_list)
     
     def __repr__(self):
         return f'<User {self.username}>'
