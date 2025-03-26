@@ -17,13 +17,6 @@
 - **Database Support**: SQLite database with Flask-SQLAlchemy for storing users, conversations, and messages.
 - **Flask Blueprints**: Modular code structure for better organization and scalability.
 
-## Demo
-
-![Chat Interface](static/images/demo-chat.png)  
-*Chat interface with file upload and speech capabilities.*
-
-![History Page](static/images/demo-history.png)  
-*Conversation history with delete functionality.*
 
 ## Prerequisites
 
@@ -34,7 +27,7 @@ Before setting up the project, ensure you have the following installed:
 - **Virtualenv** (optional but recommended)
 - **Git** (to clone the repository)
 - **OLLAMA** (for running local model)
-- **Llava:7b** (``` ollama pull llava:7b``` to download model)
+- **Llava:7b** (``` ollama run llava:7b``` to download model)
 
 ## Installation
 
