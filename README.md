@@ -33,6 +33,8 @@ Before setting up the project, ensure you have the following installed:
 - **pip** (Python package manager)
 - **Virtualenv** (optional but recommended)
 - **Git** (to clone the repository)
+- **OLLAMA** (for running local model)
+- **Lllava:7b** (``` ollama pull llava:7b``` to download model)
 
 ## Installation
 
