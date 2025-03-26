@@ -40,8 +40,8 @@ Follow these steps to set up the project locally:
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/your-username/AI-Doctor-Jhatka.git
-   cd AI-Doctor-Jhatka
+   git clone https://github.com/your-username/AI-Doctor.git
+   cd AI-Doctor
    ```
 
 2. **Set Up a Virtual Environment** (optional but recommended):
@@ -101,7 +101,7 @@ Follow these steps to set up the project locally:
 ## Project Structure
 
 ```
-AI-Doctor-Jhatka/
+AI-Doctor/
 ├── app/
 │   ├── __init__.py              # Flask app setup and blueprint registration
 │   ├── models.py                # Database models (User, Conversation, Message)
@@ -212,7 +212,7 @@ For questions or feedback, please reach out to [Naim Parvez](mailto:parveznaim0@
 
 ### Notes for Customization
 - **Screenshots**: The `README.md` includes placeholders for demo images (`static/images/demo-chat.png` and `static/images/demo-history.png`). You can take screenshots of your application and place them in the `static/images/` directory, then update the paths in the README.
-- **Repository URL**: Replace `https://github.com/your-username/AI-Doctor-Jhatka.git` with the actual URL of your GitHub repository.
+- **Repository URL**: Replace `https://github.com/your-username/AI-Doctor.git` with the actual URL of your GitHub repository.
 - **Contact Information**: Update the email address in the "Contact" section with your actual email.
 - **License**: If you’re using a different license, update the "License" section and include the appropriate `LICENSE` file in your repository.
 - **Additional Sections**: You can add sections like "Known Issues," "Roadmap," or "Acknowledgements" if needed.
