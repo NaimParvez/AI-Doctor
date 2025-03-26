@@ -34,7 +34,7 @@ Before setting up the project, ensure you have the following installed:
 - **Virtualenv** (optional but recommended)
 - **Git** (to clone the repository)
 - **OLLAMA** (for running local model)
-- **Lllava:7b** (``` ollama pull llava:7b``` to download model)
+- **Llava:7b** (``` ollama pull llava:7b``` to download model)
 
 ## Installation
 
