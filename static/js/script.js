@@ -15,29 +15,54 @@ document.addEventListener('DOMContentLoaded', () => {
     let uploadedFile = null;
     let recentFiles = JSON.parse(localStorage.getItem('recentFiles')) || [];
 
-    const addMessage = (sender, content, filePath = null, audioPath = null) => {
+    const addMessage = (sender, content, filePath = null, audioPath = null, isTyping = false) => {
         const div = document.createElement('div');
         div.className = `message ${sender} fade-in`;
-        let html = '<div class="message-content">';
-        if (content) html += `<p>${content}</p>`;
-        if (filePath) {
-            if (filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.gif')) {
-                html += `<img src="${filePath}" class="uploaded-image">`;
-            } else if (filePath.endsWith('.pdf')) {
-                html += `<a href="${filePath}" target="_blank">View PDF: ${filePath.split('/').pop()}</a>`;
-            }
-        }
-        if (audioPath) html += `<audio controls src="${audioPath}"></audio>`;
-        html += '</div>';
+        let html = `
+            <img src="/static/images/doctor-avatar.png" class="avatar" onerror="this.src='https://via.placeholder.com/40';">
+            <div class="message-content">
+                ${content ? '<p></p>' : ''}
+                ${filePath ? (filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.gif') 
+                    ? `<img src="${filePath}" class="uploaded-image">` 
+                    : filePath.endsWith('.pdf') 
+                    ? `<a href="${filePath}" target="_blank">View PDF: ${filePath.split('/').pop()}</a>` 
+                    : '') : ''}
+                ${audioPath ? `<audio controls src="${audioPath}"></audio>` : ''}
+            </div>
+        `;
         div.innerHTML = html;
         messagesDiv.appendChild(div);
+
+        if (content && isTyping) {
+            const p = div.querySelector('p');
+            typeMessage(p, content);
+        } else if (content) {
+            div.querySelector('p').textContent = content;
+        }
+
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    };
+
+    const typeMessage = (element, text) => {
+        let index = 0;
+        element.textContent = '';
+        const interval = setInterval(() => {
+            if (index < text.length) {
+                element.textContent += text.charAt(index);
+                index++;
+            } else {
+                clearInterval(interval);
+            }
+        }, 30); // Adjust the speed of typing (30ms per character)
     };
 
     const showThinking = () => {
         const div = document.createElement('div');
         div.className = 'message doctor thinking';
-        div.innerHTML = '<div class="message-content"><p>Thinking...</p></div>';
+        div.innerHTML = `
+            <img src="/static/images/doctor-avatar.png" class="avatar" onerror="this.src='https://via.placeholder.com/40';">
+            <div class="message-content"><p>Thinking...</p></div>
+        `;
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
         return div;
@@ -127,15 +152,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(messageData)
-            }).then(res => {
-                if (!res.ok) throw new Error('Failed to send message');
-                return res.json();
             });
+
+            if (!response.ok) {
+                throw new Error(`Failed to send message: ${response.statusText}`);
+            }
+
+            const data = await response.json();
 
             removeThinking(thinkingDiv);
             addMessage('user', text, filePath);
-            addMessage('doctor', response.response, null, response.audio);
+            addMessage('doctor', data.response, null, data.audio, true);
         } catch (error) {
+            console.error('Error sending message:', error);
             removeThinking(thinkingDiv);
             addMessage('doctor', 'Error sending message: ' + error.message);
         } finally {
@@ -151,7 +180,11 @@ document.addEventListener('DOMContentLoaded', () => {
     sendIcon.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
 
-    cameraIcon.addEventListener('click', () => fileUpload.click());
+    cameraIcon.addEventListener('click', () => {
+        // On mobile devices, this will prompt to take a photo or select from gallery
+        fileUpload.setAttribute('accept', 'image/*'); // Restrict to images only for camera
+        fileUpload.click();
+    });
 
     attachIcon.addEventListener('click', () => {
         renderRecentFiles();
@@ -167,14 +200,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadArea = document.querySelector('.upload-area');
     uploadArea.addEventListener('dragover', (e) => {
         e.preventDefault();
-        uploadArea.style.borderColor = '#1e90ff';
+        uploadArea.style.borderColor = '#ff6f61';
     });
     uploadArea.addEventListener('dragleave', () => {
-        uploadArea.style.borderColor = '#555';
+        uploadArea.style.borderColor = '#627288';
     });
     uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
-        uploadArea.style.borderColor = '#555';
+        uploadArea.style.borderColor = '#627288';
         const files = e.dataTransfer.files;
         if (files.length > 0) handleFileUpload(files[0]);
     });
@@ -182,6 +215,18 @@ document.addEventListener('DOMContentLoaded', () => {
     fileUpload.addEventListener('change', async () => {
         const file = fileUpload.files[0];
         if (!file) return;
+
+        // Validate file type on the frontend
+        const allowedImageTypes = ['image/png', 'image/jpeg', 'image/gif'];
+        const allowedAudioTypes = ['audio/mpeg', 'audio/wav', 'audio/webm'];
+        const allowedPdfType = 'application/pdf';
+
+        if (!allowedImageTypes.includes(file.type) && !allowedAudioTypes.includes(file.type) && file.type !== allowedPdfType) {
+            addMessage('doctor', 'Unsupported file type. Please upload an image, audio, or PDF.');
+            fileUpload.value = ''; // Clear the input
+            return;
+        }
+
         handleFileUpload(file);
     });
 
@@ -203,9 +248,48 @@ document.addEventListener('DOMContentLoaded', () => {
             displayUploadedFile(file.name, uploadResponse.file_path);
             updateRecentFiles(file.name, uploadResponse.file_path);
             attachModal.style.display = 'none';
+
+            // Automatically send the image with a default message
+            const text = chatInput.value.trim() || "Please analyze this image.";
+            const messageData = {
+                text: text,
+                image_path: uploadResponse.file_path,
+                audio_path: null,
+                generate_speech: true
+            };
+
+            const thinkingDiv = showThinking();
+            try {
+                const response = await fetch('/chat/message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(messageData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to send message: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                removeThinking(thinkingDiv);
+                addMessage('user', text, uploadResponse.file_path);
+                addMessage('doctor', data.response, null, data.audio, true);
+            } catch (error) {
+                console.error('Error sending image message:', error);
+                removeThinking(thinkingDiv);
+                addMessage('doctor', 'Error sending message: ' + error.message);
+            } finally {
+                const previewDiv = document.querySelector('.file-preview');
+                if (previewDiv) previewDiv.remove();
+                uploadedFile = null;
+            }
         } else {
             const audioPath = uploadResponse.file_path;
             const transcription = uploadResponse.transcription;
+            if (!transcription) {
+                addMessage('doctor', 'Failed to transcribe audio. Please try again.');
+                return;
+            }
             addMessage('user', transcription, null, audioPath);
 
             const messageData = {
@@ -220,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(messageData)
             }).then(res => res.json());
 
-            addMessage('doctor', response.response, null, response.audio);
+            addMessage('doctor', response.response, null, response.audio, true);
         }
     };
 
@@ -250,6 +334,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 mediaRecorder.onstop = async () => {
+                    // Stop all tracks to release the microphone
+                    stream.getTracks().forEach(track => track.stop());
+
                     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     if (audioBlob.size < 100) {
                         addMessage('doctor', 'Recording is empty or too small. Please try again.');
@@ -269,7 +356,42 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
 
-                    chatInput.value = uploadResponse.transcription;
+                    if (!uploadResponse.transcription) {
+                        addMessage('doctor', 'Failed to transcribe audio. Please try again.');
+                        return;
+                    }
+
+                    // Add the transcribed message to the chat
+                    addMessage('user', uploadResponse.transcription, null, uploadResponse.file_path);
+
+                    // Automatically send the transcribed message to the server
+                    const messageData = {
+                        text: uploadResponse.transcription,
+                        image_path: null,
+                        audio_path: uploadResponse.file_path,
+                        generate_speech: true
+                    };
+
+                    const thinkingDiv = showThinking();
+                    try {
+                        const response = await fetch('/chat/message', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(messageData)
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`Failed to send message: ${response.statusText}`);
+                        }
+
+                        const data = await response.json();
+                        removeThinking(thinkingDiv);
+                        addMessage('doctor', data.response, null, data.audio, true);
+                    } catch (error) {
+                        console.error('Error sending transcribed message:', error);
+                        removeThinking(thinkingDiv);
+                        addMessage('doctor', 'Error sending message: ' + error.message);
+                    }
                 };
 
                 mediaRecorder.start();

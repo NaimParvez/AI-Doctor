@@ -3,6 +3,7 @@ import logging
 from ollama import Client
 from PIL import Image
 import base64
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +11,26 @@ class LocalLLM:
     def __init__(self, host='http://localhost:11434'):
         self.client = Client(host=host)
         self.model_name = 'llava:7b'
+        self.host = host
         
+    @retry(
+        stop=stop_after_attempt(3),  # Retry up to 3 times
+        wait=wait_exponential(multiplier=1, min=2, max=10),  # Exponential backoff: 2s, 4s, 8s
+        retry=retry_if_exception_type(Exception),  # Retry on any exception
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retrying connection to Ollama (attempt {retry_state.attempt_number}/3)..."
+        )
+    )
+    def _chat_with_ollama(self, messages):
+        """Helper method to handle Ollama chat with retry logic."""
+        try:
+            logger.info(f"Attempting to connect to Ollama at {self.host}")
+            response = self.client.chat(model=self.model_name, messages=messages)
+            return response
+        except Exception as e:
+            logger.error(f"Failed to connect to Ollama at {self.host}: {str(e)}")
+            raise
+
     def process_text_only(self, prompt, user_info=None, language="en"):
         try:
             if user_info:
@@ -78,7 +98,7 @@ class LocalLLM:
             full_prompt = f"{system_prompt}\n\nPatient: {prompt}\n\nDr. Jhatka:"
             logger.info(f"Sending prompt to LLaVA-7B: {full_prompt}")
             
-            response = self.client.chat(model=self.model_name, messages=[
+            response = self._chat_with_ollama(messages=[
                 {'role': 'user', 'content': full_prompt}
             ])
             response_text = response['message']['content'].split("Dr. Jhatka:")[-1].strip()
@@ -89,16 +109,26 @@ class LocalLLM:
                 return "I'm sorry, I couldn't process your request. Please try again or consult a local doctor."
             return response_text
         except Exception as e:
-            logger.error(f"Error processing text query with Ollama: {e}")
+            logger.error(f"Error processing text query with Ollama: {str(e)}")
             return "I'm sorry, I encountered an issue processing your request."
 
     def process_image_query(self, image_data, prompt, user_info=None, language="en"):
         try:
+            # Validate image file
             if isinstance(image_data, str) and os.path.exists(image_data):
+                # Check if the file is a valid image
+                try:
+                    with Image.open(image_data) as img:
+                        img.verify()  # Verify that it's a valid image
+                except Exception as e:
+                    logger.error(f"Invalid image file {image_data}: {str(e)}")
+                    return "The uploaded file is not a valid image. Please upload a valid image file (e.g., PNG, JPG)."
+                
                 with open(image_data, 'rb') as f:
                     image_bytes = f.read()
                 image_base64 = base64.b64encode(image_bytes).decode('utf-8')
             else:
+                logger.warning(f"Invalid image path: {image_data}")
                 return "Invalid image format or path."
 
             if user_info:
@@ -167,7 +197,7 @@ class LocalLLM:
             full_prompt = f"{system_prompt}\n\nPatient's question: {prompt}\n\nDr. Jhatka:"
             logger.info(f"Sending image prompt to LLaVA-7B: {full_prompt}")
             
-            response = self.client.chat(model=self.model_name, messages=[
+            response = self._chat_with_ollama(messages=[
                 {
                     'role': 'user',
                     'content': full_prompt,
@@ -182,7 +212,7 @@ class LocalLLM:
                 return "I'm sorry, I couldn’t process your request. Please try again or consult a local doctor."
             return response_text
         except Exception as e:
-            logger.error(f"Error processing image query with Ollama: {e}")
+            logger.error(f"Error processing image query with Ollama: {str(e)}")
             return "I'm sorry, I encountered an issue analyzing the image."
 
 llm_service = LocalLLM(host=os.environ.get('OLLAMA_HOST', 'http://localhost:11434'))

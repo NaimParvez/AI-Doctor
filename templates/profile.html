@@ -1,28 +1,141 @@
 {% extends "base.html" %}
-{% block title %}AI Doctor - Profile{% endblock %}
+{% block title %}Profile{% endblock %}
 {% block content %}
     <header>
         <img src="{{ url_for('static', filename='images/doctor-avatar.png') }}" alt="Doctor" class="logo">
-        <h1>AI Doctor - Profile</h1>
+        <h1>Profile</h1>
         <a href="{{ url_for('chat.chat_page') }}">Back to Chat</a>
-        <a href="{{ url_for('main.history') }}">History</a>
         <a href="{{ url_for('auth.logout') }}">Logout</a>
     </header>
     <div class="chat-window">
-        <h2>Profile</h2>
-        <p><strong>Username:</strong> {{ user.username }}</p>
-        <p><strong>Email:</strong> {{ user.email }}</p>
-        {% if user.age %}
-            <p><strong>Age:</strong> {{ user.age }}</p>
-        {% endif %}
-        {% if user.gender %}
-            <p><strong>Gender:</strong> {{ user.gender }}</p>
-        {% endif %}
-        {% if user.medical_history %}
-            <p><strong>Medical History:</strong> {{ user.medical_history }}</p>
-        {% else %}
-            <p><strong>Medical History:</strong> Not provided</p>
-        {% endif %}
-        <p><strong>Joined:</strong> {{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+        <h2>Welcome, {{ user.username }}!</h2>
+        <div id="profile-view">
+            <div class="form-group">
+                <label>Username:</label>
+                <p>{{ user.username }}</p>
+            </div>
+            <div class="form-group">
+                <label>Email:</label>
+                <p>{{ user.email }}</p>
+            </div>
+            <div class="form-group">
+                <label>Date of Birth:</label>
+                <p>{{ user.date_of_birth.strftime('%Y-%m-%d') if user.date_of_birth else 'Not provided' }}</p>
+            </div>
+            <div class="form-group">
+                <label>Gender:</label>
+                <p>{{ user.gender if user.gender else 'Not provided' }}</p>
+            </div>
+            <div class="form-group">
+                <label>Medical History:</label>
+                <p>{{ user.medical_history if user.medical_history else 'Not provided' }}</p>
+            </div>
+            <button id="edit-profile-btn">Edit Profile</button>
+        </div>
+
+        <form id="profile-form" method="POST" action="{{ url_for('auth.update_profile') }}" style="display: none;">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" value="{{ user.username }}" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" value="{{ user.email }}" required>
+            </div>
+            <div class="form-group">
+                <label for="date_of_birth">Date of Birth:</label>
+                <input type="date" id="date_of_birth" name="date_of_birth" value="{{ user.date_of_birth.strftime('%Y-%m-%d') if user.date_of_birth else '' }}">
+            </div>
+            <div class="form-group">
+                <label for="gender">Gender:</label>
+                <select id="gender" name="gender">
+                    <option value="" {% if not user.gender %}selected{% endif %}>Select Gender</option>
+                    <option value="male" {% if user.gender == 'male' %}selected{% endif %}>Male</option>
+                    <option value="female" {% if user.gender == 'female' %}selected{% endif %}>Female</option>
+                    <option value="other" {% if user.gender == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Medical History:</label>
+                <div class="medical-history-options">
+                    <label><input type="checkbox" name="diseases" value="Diabetes" {% if user.medical_history and 'Diabetes' in user.medical_history %}checked{% endif %}> Diabetes</label>
+                    <label><input type="checkbox" name="diseases" value="Hypertension" {% if user.medical_history and 'Hypertension' in user.medical_history %}checked{% endif %}> Hypertension</label>
+                    <label><input type="checkbox" name="diseases" value="Asthma" {% if user.medical_history and 'Asthma' in user.medical_history %}checked{% endif %}> Asthma</label>
+                    <label><input type="checkbox" name="diseases" value="Allergies" {% if user.medical_history and 'Allergies' in user.medical_history %}checked{% endif %}> Allergies</label>
+                    <label><input type="checkbox" name="diseases" value="Heart Disease" {% if user.medical_history and 'Heart Disease' in user.medical_history %}checked{% endif %}> Heart Disease</label>
+                    <label><input type="checkbox" name="diseases" value="Thyroid Disorder" {% if user.medical_history and 'Thyroid Disorder' in user.medical_history %}checked{% endif %}> Thyroid Disorder</label>
+                </div>
+                <textarea id="medical_history" name="medical_history" rows="4" placeholder="Enter your medical history (selected diseases will appear here)">{{ user.medical_history if user.medical_history else '' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="password">New Password (leave blank to keep current password):</label>
+                <input type="password" id="password" name="password">
+            </div>
+            <button type="submit" onclick="return confirm('Are you sure you want to save these changes?');">Save Changes</button>
+            <button type="button" id="cancel-edit-btn">Cancel</button>
+        </form>
+
+        <form id="delete-account-form" method="POST" action="{{ url_for('auth.delete_account') }}">
+            <button type="submit" id="delete-account-btn" onclick="return confirm('Are you sure you want to delete your account? This action cannot be undone.');">Delete Account</button>
+        </form>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <p class="message-box {{ category }}">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
     </div>
+
+    <script>
+        const editProfileBtn = document.querySelector('#edit-profile-btn');
+        const cancelEditBtn = document.querySelector('#cancel-edit-btn');
+        const profileView = document.querySelector('#profile-view');
+        const profileForm = document.querySelector('#profile-form');
+
+        editProfileBtn.addEventListener('click', () => {
+            profileView.style.display = 'none';
+            profileForm.style.display = 'block';
+        });
+
+        cancelEditBtn.addEventListener('click', () => {
+            profileView.style.display = 'block';
+            profileForm.style.display = 'none';
+        });
+
+        const checkboxes = document.querySelectorAll('input[name="diseases"]');
+        const textarea = document.querySelector('#medical_history');
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const selectedDiseases = Array.from(checkboxes)
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value);
+                const currentText = textarea.value;
+                const additionalText = currentText.includes('Past diseases:') 
+                    ? currentText.split('\n').slice(1).join('\n').trim() 
+                    : currentText;
+                textarea.value = selectedDiseases.length > 0 
+                    ? 'Past diseases: ' + selectedDiseases.join(', ') + (additionalText ? '\n' + additionalText : '')
+                    : additionalText;
+            });
+        });
+
+        textarea.addEventListener('input', () => {
+            const selectedDiseases = Array.from(checkboxes)
+                .filter(cb => cb.checked)
+                .map(cb => cb.value);
+            const baseText = selectedDiseases.length > 0 
+                ? 'Past diseases: ' + selectedDiseases.join(', ') + '\n'
+                : '';
+            const currentText = textarea.value;
+            if (!currentText.startsWith(baseText)) {
+                const additionalText = currentText.includes('Past diseases:') 
+                    ? currentText.split('\n').slice(1).join('\n').trim() 
+                    : currentText;
+                textarea.value = baseText + additionalText;
+            }
+        });
+    </script>
 {% endblock %}

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}AI Doctor - Register{% endblock %}
+{% block title %}Register{% endblock %}
 {% block content %}
     <header>
         <img src="{{ url_for('static', filename='images/doctor-avatar.png') }}" alt="Doctor" class="logo">
-        <h1>AI Doctor - Register</h1>
+        <h1>Register</h1>
         <a href="{{ url_for('auth.login') }}">Login</a>
     </header>
     <div class="chat-window">
@@ -34,8 +34,16 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="medical_history">Medical History (e.g., allergies, conditions, medications):</label>
-                <textarea id="medical_history" name="medical_history" rows="4" placeholder="Enter your medical history (optional)"></textarea>
+                <label>Medical History:</label>
+                <div class="medical-history-options">
+                    <label><input type="checkbox" name="diseases" value="Diabetes"> Diabetes</label>
+                    <label><input type="checkbox" name="diseases" value="Hypertension"> Hypertension</label>
+                    <label><input type="checkbox" name="diseases" value="Asthma"> Asthma</label>
+                    <label><input type="checkbox" name="diseases" value="Allergies"> Allergies</label>
+                    <label><input type="checkbox" name="diseases" value="Heart Disease"> Heart Disease</label>
+                    <label><input type="checkbox" name="diseases" value="Thyroid Disorder"> Thyroid Disorder</label>
+                </div>
+                <textarea id="medical_history" name="medical_history" rows="4" placeholder="Enter your medical history (selected diseases will appear here)"></textarea>
             </div>
             <button type="submit">Register</button>
         </form>
@@ -47,4 +55,31 @@
             {% endif %}
         {% endwith %}
     </div>
+    <script>
+        const checkboxes = document.querySelectorAll('input[name="diseases"]');
+        const textarea = document.querySelector('#medical_history');
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const selectedDiseases = Array.from(checkboxes)
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value);
+                textarea.value = selectedDiseases.length > 0 
+                    ? 'Past diseases: ' + selectedDiseases.join(', ') 
+                    : '';
+            });
+        });
+
+        textarea.addEventListener('input', () => {
+            const selectedDiseases = Array.from(checkboxes)
+                .filter(cb => cb.checked)
+                .map(cb => cb.value);
+            const baseText = selectedDiseases.length > 0 
+                ? 'Past diseases: ' + selectedDiseases.join(', ') + '\n'
+                : '';
+            if (!textarea.value.startsWith(baseText)) {
+                textarea.value = baseText + textarea.value;
+            }
+        });
+    </script>
 {% endblock %}

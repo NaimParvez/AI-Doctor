@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}AI Doctor - Chat{% endblock %}
+{% block title %}Chat{% endblock %}
 {% block content %}
     <header>
         <img src="{{ url_for('static', filename='images/doctor-avatar.png') }}" alt="Doctor" class="logo">
-        <h1>AI Doctor - Dr. Jhatka</h1>
+        <h1>Dr. Jhatka</h1>
         <a href="{{ url_for('auth.profile') }}">Profile</a>
         <a href="{{ url_for('auth.logout') }}">Logout</a>
         <a href="{{ url_for('main.history') }}">History</a>
@@ -13,6 +13,7 @@
             {% for conversation in conversations %}
                 {% for message in conversation.messages %}
                     <div class="message {{ message.sender }}">
+                        <img src="{{ url_for('static', filename='images/doctor-avatar.png') }}" class="avatar" onerror="this.src='https://via.placeholder.com/40';">
                         <div class="message-content">
                             {% if message.text_content %}<p>{{ message.text_content }}</p>{% endif %}
                             {% if message.image_path %}
@@ -59,4 +60,6 @@
             </div>
         </div>
     </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 {% endblock %}

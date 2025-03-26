@@ -20,6 +20,12 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     login_manager.init_app(app)
     
+    # Define user loader for Flask-Login
+    @login_manager.user_loader
+    def load_user(user_id):
+        from app.models import User
+        return User.query.get(int(user_id))
+    
     # Register blueprints after extensions are initialized
     from app.routes.main import main_bp
     from app.routes.auth import auth_bp
