@@ -1,109 +1,126 @@
 import os
+import base64
 import logging
 from ollama import Client
-from PIL import Image
-import base64
 from googletrans import Translator
+
+from PIL import Image
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
 class LocalLLM:
-    def __init__(self, host='http://localhost:11434'):
+    def __init__(self, host='http://127.0.0.1:11434'):
         self.client = Client(host=host)
         self.model_name = 'llava:7b'
         self.translator = Translator()
-        
+
+    def _translate_to_english(self, text):
+        try:
+            return self.translator.translate(text, src='bn', dest='en').text
+        except Exception as e:
+            logger.error(f"Translation to English failed: {str(e)}")
+            return text
+
+    def _translate_to_bangla(self, text):
+        try:
+            return self.translator.translate(text, src='en', dest='bn').text
+        except Exception as e:
+            logger.error(f"Translation to Bangla failed: {str(e)}")
+            return text
+
+    def _build_prompt(self, base_instruction, prompt, user_info=None):
+        context = ""
+        if user_info:
+            if user_info.get('age'):
+                context += f"The patient is {user_info['age']} years old. "
+            if user_info.get('gender'):
+                context += f"The patient's gender is {user_info['gender']}. "
+        return f"You are Dr. Jhatka, a professional medical assistant. {context}{base_instruction}\n\nPatient: {prompt}\n\nDr. Jhatka:"
+
+
+
+    def _encode_image(self, image_path_or_bytes):
+        try:
+            image = None
+
+            if isinstance(image_path_or_bytes, bytes):
+                image = Image.open(BytesIO(image_path_or_bytes))
+            elif isinstance(image_path_or_bytes, str) and os.path.exists(image_path_or_bytes):
+                image = Image.open(image_path_or_bytes)
+            else:
+                logger.error(f"Invalid image path or bytes: {image_path_or_bytes}")
+                return None
+
+            # Resize image to max 512x512 to reduce processing time
+            image.thumbnail((512, 512))
+
+            buffer = BytesIO()
+            image.save(buffer, format='JPEG')
+            buffer.seek(0)
+            return base64.b64encode(buffer.read()).decode('utf-8')
+
+        except Exception as e:
+            logger.error(f"Image encoding failed: {str(e)}")
+            return None
+
+
     def process_text_only(self, prompt, user_info=None, language="en"):
         try:
-            # Translate Bangla to English if needed
-            original_language = language
             if language == 'bn':
-                prompt = self.translator.translate(prompt, src='bn', dest='en').text
-                logger.info(f"Translated Bangla prompt to English: {prompt}")
+                prompt = self._translate_to_english(prompt)
 
-            if user_info:
-                user_context = ""
-                if user_info.get('age'):
-                    user_context += f"The patient is {user_info['age']} years old. "
-                if user_info.get('gender'):
-                    user_context += f"The patient's gender is {user_info['gender']}. "
-                system_prompt = f"""You are Dr. Jhatka, a professional medical assistant. {user_context}
-                Please provide helpful medical information based on the patient's query."""
-            else:
-                system_prompt = """You are Dr. Jhatka, a professional medical assistant.
-                Please provide helpful medical information based on the patient's query."""
-            full_prompt = f"{system_prompt}\n\nPatient: {prompt}\n\nDr. Jhatka:"
-            logger.info(f"Sending prompt to LLaVA-7B: {full_prompt}")
-            
-            response = self.client.chat(model=self.model_name, messages=[
-                {'role': 'user', 'content': full_prompt}
-            ])
-            response_text = response['message']['content'].split("Dr. Jhatka:")[-1].strip()
-            logger.info(f"Received response: {response_text}")
-            
-            # Translate response back to Bangla if needed
-            if original_language == 'bn':
-                response_text = self.translator.translate(response_text, src='en', dest='bn').text
-                logger.info(f"Translated response to Bangla: {response_text}")
+            full_prompt = self._build_prompt(
+                "Please provide helpful medical information based on the patient's query.",
+                prompt,
+                user_info
+            )
 
-            if not response_text or response_text.strip() == "":
-                logger.warning("LLaVA-7B returned an empty response")
-                return "আমি দুঃখিত, আমি আপনার অনুরোধটি বাংলায় প্রক্রিয়া করতে পারিনি। অনুগ্রহ করে ইংরেজিতে চেষ্টা করুন বা স্থানীয় ডাক্তারের সাথে পরামর্শ করুন।" if original_language == 'bn' else "I'm sorry, I couldn't process your request in Bangla. Please try in English or consult a local doctor."
-            return response_text
+            response = self.client.chat(model=self.model_name, messages=[{'role': 'user', 'content': full_prompt}])
+            response_text = response.get('message', {}).get('content', '').strip()
+
+            if "Dr. Jhatka:" in response_text:
+                response_text = response_text.split("Dr. Jhatka:")[-1].strip()
+
+            if not response_text:
+                return "আমি দুঃখিত, আমি আপনার অনুরোধটি প্রক্রিয়া করতে পারিনি।" if language == 'bn' else "I'm sorry, I couldn't process your request."
+
+            return self._translate_to_bangla(response_text) if language == 'bn' else response_text
+
         except Exception as e:
-            logger.error(f"Error processing text query with Ollama: {e}")
+            logger.error(f"Error processing text query: {str(e)}")
             return "আমি দুঃখিত, আমি আপনার অনুরোধটি প্রক্রিয়া করতে সমস্যায় পড়েছি।" if language == 'bn' else "I'm sorry, I encountered an issue processing your request."
 
-    def process_image_query(self, image_data, prompt, user_info=None, language="en"):
+    def process_image_query(self, image_path_or_bytes, prompt="", user_info=None, language="en"):
         try:
-            if isinstance(image_data, str) and os.path.exists(image_data):
-                with open(image_data, 'rb') as f:
-                    image_bytes = f.read()
-                image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-            else:
-                return "Invalid image format or path."
-
-            # Translate Bangla to English if needed
-            original_language = language
             if language == 'bn':
-                prompt = self.translator.translate(prompt, src='bn', dest='en').text
-                logger.info(f"Translated Bangla prompt to English: {prompt}")
+                prompt = self._translate_to_english(prompt)
 
-            if user_info:
-                user_context = ""
-                if user_info.get('age'):
-                    user_context += f"The patient is {user_info['age']} years old. "
-                if user_info.get('gender'):
-                    user_context += f"The patient's gender is {user_info['gender']}. "
-                system_prompt = f"""You are Dr. Jhatka, a professional medical assistant. {user_context}
-                Examine the uploaded medical image and provide insights based on what you see."""
-            else:
-                system_prompt = """You are Dr. Jhatka, a professional medical assistant.
-                Examine the uploaded medical image and provide insights based on what you see."""
-            full_prompt = f"{system_prompt}\n\nPatient's question: {prompt}\n\nDr. Jhatka:"
-            logger.info(f"Sending image prompt to LLaVA-7B: {full_prompt}")
-            
-            response = self.client.chat(model=self.model_name, messages=[
-                {
-                    'role': 'user',
-                    'content': full_prompt,
-                    'images': [image_base64]
-                }
-            ])
-            response_text = response['message']['content'].split("Dr. Jhatka:")[-1].strip()
-            logger.info(f"Received image response: {response_text}")
-            
-            # Translate response back to Bangla if needed
-            if original_language == 'bn':
-                response_text = self.translator.translate(response_text, src='en', dest='bn').text
-                logger.info(f"Translated response to Bangla: {response_text}")
+            full_prompt = self._build_prompt(
+                "Please analyze the patient's medical image and provide a helpful response.",
+                prompt,
+                user_info
+            )
 
-            if not response_text or response_text.strip() == "":
-                logger.warning("LLaVA-7B returned an empty response for image query")
-                return "আমি দুঃখিত, আমি আপনার অনুরোধটি বাংলায় প্রক্রিয়া করতে পারিনি। অনুগ্রহ করে ইংরেজিতে চেষ্টা করুন বা স্থানীয় ডাক্তারের সাথে পরামর্শ করুন।" if original_language == 'bn' else "I'm sorry, I couldn't process your request in Bangla. Please try in English or consult a local doctor."
-            return response_text
+            encoded_image = self._encode_image(image_path_or_bytes)
+            if not encoded_image:
+                return "ছবি প্রক্রিয়া করতে ব্যর্থ হয়েছে।" if language == 'bn' else "Failed to process image."
+
+            response = self.client.chat(
+                model=self.model_name,
+                messages=[{'role': 'user', 'content': full_prompt}],
+                images=[encoded_image]
+            )
+
+            response_text = response.get('message', {}).get('content', '').strip()
+            if "Dr. Jhatka:" in response_text:
+                response_text = response_text.split("Dr. Jhatka:")[-1].strip()
+
+            if not response_text:
+                return "আমি দুঃখিত, আমি আপনার অনুরোধটি প্রক্রিয়া করতে পারিনি।" if language == 'bn' else "I'm sorry, I couldn't process your request."
+
+            return self._translate_to_bangla(response_text) if language == 'bn' else response_text
+
         except Exception as e:
-            logger.error(f"Error processing image query with Ollama: {e}")
-            return "আমি দুঃখিত, আমি ছবিটি বিশ্লেষণ করতে সমস্যায় পড়েছি।" if language == 'bn' else "I'm sorry, I encountered an issue analyzing the image."
-
-llm_service = LocalLLM(host=os.environ.get('OLLAMA_HOST', 'http://localhost:11434'))
+            logger.error(f"Error processing image query: {str(e)}")
+            return "আমি দুঃখিত, আমি আপনার অনুরোধটি প্রক্রিয়া করতে সমস্যায় পড়েছি।" if language == 'bn' else "I'm sorry, I encountered an issue processing your request."

@@ -1,61 +1,52 @@
 import os
 import time
-import threading
+import logging
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
+
 from app import db
 from app.models import Conversation, Message
 from app.utils.llm_local import llm_service
 from app.utils.speech import speech_service
-import logging
 
 chat_bp = Blueprint('chat', __name__)
 
-# Configure logging for debugging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp3', 'wav', 'webm', 'pdf'}
+
 def allowed_file(filename):
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp3', 'wav', 'webm', 'pdf'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def get_user_info(conversation_id=None):
     if not current_user.is_authenticated:
-        logger.warning("Attempt to get user info for unauthenticated user")
+        logger.warning("Unauthenticated user attempted to fetch user info")
         return None
+
     user_info = {
         'username': current_user.username,
-        'email': current_user.email
+        'email': current_user.email,
+        'age': current_user.age,
+        'gender': current_user.gender,
+        'medical_history': current_user.medical_history or "No medical history provided."
     }
-    if current_user.age:
-        user_info['age'] = current_user.age
-    if current_user.gender:
-        user_info['gender'] = current_user.gender
-    if current_user.medical_history:
-        user_info['medical_history'] = current_user.medical_history
-    else:
-        user_info['medical_history'] = "No medical history provided."
 
-    # Fetch previous conversation messages if a conversation_id is provided
     if conversation_id:
         conversation = Conversation.query.get(conversation_id)
         if conversation and conversation.user_id == current_user.id:
-            # Fetch only the last 5 messages to improve performance
             messages = conversation.messages.order_by(Message.timestamp.asc()).limit(5).all()
-            user_info['previous_conversation'] = [
-                {
-                    'sender': message.sender,
-                    'text': message.text_content,
-                    'image_path': message.image_path,
-                    'timestamp': message.timestamp.isoformat()
-                }
-                for message in messages
-            ]
+            user_info['previous_conversation'] = [{
+                'sender': m.sender,
+                'text': m.text_content,
+                'image_path': m.image_path,
+                'timestamp': m.timestamp.isoformat()
+            } for m in messages]
         else:
             user_info['previous_conversation'] = []
-            logger.warning(f"Conversation {conversation_id} not found or does not belong to user {current_user.username}")
+            logger.warning(f"Conversation {conversation_id} not found or unauthorized for user {current_user.username}")
     else:
         user_info['previous_conversation'] = []
 
@@ -65,182 +56,157 @@ def get_user_info(conversation_id=None):
 @login_required
 def chat_page():
     conversations = Conversation.query.filter_by(user_id=current_user.id).order_by(Conversation.start_time.asc()).all()
-    # If no conversations exist, create one and add the user's medical history as the first message
+
     if not conversations:
         conversation = Conversation(user_id=current_user.id)
         db.session.add(conversation)
         try:
             db.session.commit()
-            logger.info(f"Created new conversation for user {current_user.username}, ID: {conversation.id}")
-            # Add medical history as the first message if it exists
-            medical_history = current_user.medical_history if current_user.medical_history else "No medical history provided."
-            medical_history_message = Message(
+            logger.info(f"New conversation created for {current_user.username} (ID: {conversation.id})")
+
+            message = Message(
                 conversation_id=conversation.id,
                 sender='user',
-                text_content=f"Medical History: {medical_history}"
+                text_content=f"Medical History: {current_user.medical_history or 'No medical history provided.'}"
             )
-            db.session.add(medical_history_message)
+            db.session.add(message)
             db.session.commit()
             conversations = [conversation]
-            logger.info(f"Added medical history message to conversation {conversation.id} for user {current_user.username}")
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Failed to create conversation for user {current_user.username}: {str(e)}")
-            return render_template('index.html', username=current_user.username, conversations=[], error="Failed to initialize conversation")
+            logger.error(f"Error initializing conversation for {current_user.username}: {e}")
+            return render_template('index.html', username=current_user.username, conversations=[], error="Conversation init failed.")
+
     return render_template('index.html', username=current_user.username, conversations=conversations)
 
 @chat_bp.route('/upload', methods=['POST'])
 @login_required
 def upload_file():
-    if 'file' not in request.files:
-        logger.warning(f"User {current_user.username} attempted to upload a file with no file part")
-        return jsonify({'error': 'No file part'}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        logger.warning(f"User {current_user.username} attempted to upload a file with no filename")
-        return jsonify({'error': 'No selected file'}), 400
-    
-    if file and allowed_file(file.filename):
-        filename = secure_filename(f"{int(time.time())}_{file.filename}")
-        upload_folder = current_app.config['UPLOAD_FOLDER']
-        os.makedirs(upload_folder, exist_ok=True)
-        file_path = os.path.join(upload_folder, filename)
-        try:
-            file.save(file_path)
-            relative_path = f"/static/uploads/{filename}"
-            logger.info(f"User {current_user.username} uploaded file: {relative_path}")
-            
-            if filename.lower().endswith(('.mp3', '.wav', '.webm')):
-                try:
-                    transcription = speech_service.speech_to_text(file_path, language="en-US")
-                    if not transcription:
-                        logger.warning(f"Transcription failed for audio file: {file_path}")
-                        return jsonify({'error': 'Failed to transcribe audio'}), 500
-                    return jsonify({
-                        'file_path': relative_path,
-                        'transcription': transcription,
-                        'file_type': 'audio',
-                        'detected_language': 'en'
-                    })
-                except Exception as e:
-                    logger.error(f"Transcription failed for audio file {file_path}: {str(e)}")
-                    return jsonify({'error': 'Failed to transcribe audio'}), 500
-            elif filename.lower().endswith('.pdf'):
-                return jsonify({'file_path': relative_path, 'file_type': 'pdf'})
-            else:
-                return jsonify({'file_path': relative_path, 'file_type': 'image'})
-        except Exception as e:
-            logger.error(f"Failed to save uploaded file for user {current_user.username}: {str(e)}")
-            return jsonify({'error': 'Failed to save file'}), 500
-    
-    logger.warning(f"User {current_user.username} attempted to upload an invalid file type: {file.filename}")
-    return jsonify({'error': 'File type not allowed'}), 400
+    file = request.files.get('file')
+    if not file or file.filename == '':
+        logger.warning(f"{current_user.username} submitted invalid file upload")
+        return jsonify({'error': 'No file selected'}), 400
+
+    if not allowed_file(file.filename):
+        logger.warning(f"{current_user.username} attempted to upload unsupported file: {file.filename}")
+        return jsonify({'error': 'File type not allowed'}), 400
+
+    filename = secure_filename(f"{int(time.time())}_{file.filename}")
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    os.makedirs(upload_folder, exist_ok=True)
+
+    file_path = os.path.join(upload_folder, filename)
+    relative_path = f"/static/uploads/{filename}"
+
+    try:
+        file.save(file_path)
+        logger.info(f"{current_user.username} uploaded file: {relative_path}")
+
+        if filename.lower().endswith(('.mp3', '.wav', '.webm')):
+            try:
+                transcription = speech_service.speech_to_text(file_path, language="en-US")
+                if not transcription:
+                    raise ValueError("Empty transcription")
+                return jsonify({
+                    'file_path': relative_path,
+                    'transcription': transcription,
+                    'file_type': 'audio',
+                    'detected_language': 'en'
+                })
+            except Exception as e:
+                logger.error(f"Audio transcription failed for {file_path}: {e}")
+                return jsonify({'error': 'Failed to transcribe audio'}), 500
+
+        file_type = 'pdf' if filename.endswith('.pdf') else 'image'
+        return jsonify({'file_path': relative_path, 'file_type': file_type})
+
+    except Exception as e:
+        logger.error(f"Failed to save file from {current_user.username}: {e}")
+        return jsonify({'error': 'File save error'}), 500
 
 @chat_bp.route('/message', methods=['POST'])
 @login_required
 def send_message():
-    data = request.json
-    if not data:
-        logger.warning(f"User {current_user.username} sent an empty message request")
-        return jsonify({'error': 'No data provided'}), 400
-
-    text_content = data.get('text', '')
-    file_path = data.get('image_path')
+    data = request.json or {}
+    text = data.get('text', '')
+    image_path = data.get('image_path')
     audio_path = data.get('audio_path')
-    conversation_id = data.get('conversation_id')
+    conv_id = data.get('conversation_id')
 
-    # Validate input: at least one of text, image, or audio must be provided
-    if not text_content and not file_path and not audio_path:
-        logger.warning(f"User {current_user.username} attempted to send an empty message")
-        return jsonify({'error': 'Message, image, or audio is required'}), 400
+    if not any([text, image_path, audio_path]):
+        logger.warning(f"{current_user.username} submitted empty message")
+        return jsonify({'error': 'Message or media required'}), 400
 
-    # Validate conversation_id if provided
-    if conversation_id:
+    conversation = None
+    if conv_id:
         try:
-            conversation_id = int(conversation_id)
-            conversation = Conversation.query.get(conversation_id)
+            conv_id = int(conv_id)
+            conversation = Conversation.query.get(conv_id)
             if not conversation or conversation.user_id != current_user.id:
-                logger.warning(f"User {current_user.username} attempted to access invalid conversation ID: {conversation_id}")
-                return jsonify({'error': 'Conversation not found'}), 404
-        except (ValueError, TypeError):
-            logger.warning(f"User {current_user.username} provided invalid conversation ID: {conversation_id}")
+                return jsonify({'error': 'Invalid conversation'}), 404
+        except (TypeError, ValueError):
             return jsonify({'error': 'Invalid conversation ID'}), 400
     else:
         conversation = Conversation(user_id=current_user.id)
         db.session.add(conversation)
         try:
-            db.session.commit()  # Commit the conversation to assign an ID
-            logger.info(f"Created new conversation for user {current_user.username}, ID: {conversation.id}")
+            db.session.commit()
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Failed to create conversation for user {current_user.username}: {str(e)}")
-            return jsonify({'error': 'Failed to create conversation'}), 500
+            return jsonify({'error': 'Conversation creation failed'}), 500
 
-    # Create user message
-    user_message = Message(
+    user_msg = Message(
         conversation_id=conversation.id,
         sender='user',
-        text_content=text_content,
-        image_path=file_path,
+        text_content=text,
+        image_path=image_path,
         audio_path=audio_path
     )
-    db.session.add(user_message)
+    db.session.add(user_msg)
     conversation.last_updated = datetime.utcnow()
 
-    # Pass the conversation_id to get_user_info to fetch previous messages
-    user_info = get_user_info(conversation_id=conversation.id)
+    user_info = get_user_info(conversation.id)
     if not user_info:
-        logger.error(f"Failed to get user info for user {current_user.username}")
-        return jsonify({'error': 'Failed to retrieve user information'}), 500
+        return jsonify({'error': 'User info retrieval failed'}), 500
 
-    # Process the message with the LLM
     try:
-        if file_path:
-            abs_file_path = os.path.join(current_app.root_path, '..', file_path.lstrip('/'))
-            if not os.path.exists(abs_file_path):
-                logger.warning(f"Image file not found for user {current_user.username}: {abs_file_path}")
-                return jsonify({'error': 'Image file not found'}), 404
-            response_text = llm_service.process_image_query(abs_file_path, text_content, user_info)
+        if image_path:
+            abs_path = os.path.join(current_app.root_path, '..', image_path.lstrip('/'))
+            if not os.path.exists(abs_path):
+                return jsonify({'error': 'Image file missing'}), 404
+            response = llm_service.process_image_query(abs_path, text, user_info)
         else:
-            response_text = llm_service.process_text_only(text_content, user_info)
+            response = llm_service.process_text_only(text, user_info)
     except Exception as e:
-        logger.error(f"Error processing message for user {current_user.username}: {str(e)}")
-        return jsonify({'error': 'Failed to process message with LLM'}), 500
+        logger.error(f"LLM failed for user {current_user.username}: {e}")
+        return jsonify({'error': 'LLM processing failed'}), 500
 
-    # Create doctor message
-    speech_filename = f"response_{int(time.time())}.mp3"
-    speech_path = os.path.join(current_app.config['UPLOAD_FOLDER'], speech_filename)
-    speech_relative_path = f"/static/uploads/{speech_filename}"
-    
-    doctor_message = Message(
+    audio_filename = f"response_{int(time.time())}.mp3"
+    audio_abs_path = os.path.join(current_app.config['UPLOAD_FOLDER'], audio_filename)
+    audio_rel_path = f"/static/uploads/{audio_filename}"
+
+    doctor_msg = Message(
         conversation_id=conversation.id,
         sender='doctor',
-        text_content=response_text,
-        audio_path=speech_relative_path
+        text_content=response,
+        audio_path=audio_rel_path
     )
-    db.session.add(doctor_message)
+    db.session.add(doctor_msg)
 
-    # Commit all database changes
     try:
         db.session.commit()
-        logger.info(f"Messages saved for user {current_user.username} in conversation {conversation.id}")
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to save messages for user {current_user.username}: {str(e)}")
-        return jsonify({'error': 'Failed to save message'}), 500
+        return jsonify({'error': 'Database commit failed'}), 500
 
-    # Generate speech synchronously
     try:
-        speech_service.text_to_speech(response_text, speech_path)
-        logger.info(f"Generated speech for response in conversation {conversation.id}")
+        speech_service.text_to_speech(response, audio_abs_path)
     except Exception as e:
-        logger.error(f"Failed to generate speech for conversation {conversation.id}: {str(e)}")
-        # Set audio path to None if speech generation fails
-        speech_relative_path = None
+        logger.warning(f"Speech generation failed: {e}")
+        audio_rel_path = None
 
     return jsonify({
-        'response': response_text,
-        'audio': speech_relative_path,
+        'response': response,
+        'audio': audio_rel_path,
         'conversation_id': conversation.id
     })

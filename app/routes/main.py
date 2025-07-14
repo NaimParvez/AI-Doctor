@@ -1,5 +1,5 @@
 import os
-from flask import Blueprint, render_template, jsonify, redirect, url_for
+from flask import Blueprint, render_template, jsonify, redirect, url_for, current_app
 from flask_login import login_required, current_user
 from app import db
 from app.models import Conversation, Message
@@ -15,24 +15,39 @@ def index():
 @main_bp.route('/history')
 @login_required
 def history():
-    conversations = Conversation.query.filter_by(user_id=current_user.id).order_by(Conversation.start_time.asc()).all()
+    conversations = (
+        Conversation.query
+        .filter_by(user_id=current_user.id)
+        .order_by(Conversation.start_time.asc())
+        .all()
+    )
     return render_template('history.html', conversations=conversations)
 
 @main_bp.route('/delete_conversation/<int:conversation_id>', methods=['DELETE'])
 @login_required
 def delete_conversation(conversation_id):
     conversation = Conversation.query.get_or_404(conversation_id)
+
     if conversation.user_id != current_user.id:
         return jsonify({'error': 'Unauthorized'}), 403
 
-    # Delete associated files
-    for message in conversation.messages:
-        if message.image_path and os.path.exists(os.path.join('static', message.image_path.lstrip('/'))):
-            os.remove(os.path.join('static', message.image_path.lstrip('/')))
-        if message.audio_path and os.path.exists(os.path.join('static', message.audio_path.lstrip('/'))):
-            os.remove(os.path.join('static', message.audio_path.lstrip('/')))
+    try:
+        upload_folder = current_app.config['UPLOAD_FOLDER']
 
-    # Delete the conversation (cascades to messages due to cascade='all, delete-orphan')
-    db.session.delete(conversation)
-    db.session.commit()
-    return jsonify({'message': 'Conversation deleted successfully'})
+        # Delete associated media files (image and audio)
+        for message in conversation.messages:
+            for file_attr in ['image_path', 'audio_path']:
+                file_path = getattr(message, file_attr)
+                if file_path:
+                    absolute_path = os.path.join(upload_folder, os.path.basename(file_path))
+                    if os.path.exists(absolute_path):
+                        os.remove(absolute_path)
+
+        # Delete the conversation and its messages
+        db.session.delete(conversation)
+        db.session.commit()
+        return jsonify({'message': 'Conversation deleted successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to delete conversation: {str(e)}'}), 500
