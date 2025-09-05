@@ -130,7 +130,6 @@ Visit `http://127.0.0.1:5000` to start your AI medical consultation!
 - **Redis** - For session storage and caching
 - **Docker** - For containerized deployment
 
-## ⚙️ Installation
 
 ## ⚙️ Installation
 
@@ -667,7 +666,6 @@ socket.on("ai_response", (data) => {
 });
 ```
 
-## 🔨 Development & Extension
 
 ## 🔨 Development & Extension
 
